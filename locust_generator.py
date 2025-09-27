@@ -1,319 +1,239 @@
-"""
-Locust Script Generator Utility
-
-This module provides utilities to convert flow JSON data into executable Locust scripts.
-"""
-
+import yaml
 import json
-import os
-from pathlib import Path
-from datetime import datetime
-from typing import Dict, List, Any, Optional
 
-
-class LocustGenerator:
-    """Generates Locust scripts from flow JSON data."""
-    
-    def __init__(self, scripts_dir: str = "scripts"):
-        """
-        Initialize the Locust generator.
-        
-        Args:
-            scripts_dir: Directory to save generated scripts
-        """
-        self.scripts_dir = Path(scripts_dir)
-        self.scripts_dir.mkdir(exist_ok=True)
-    
-    def generate_locust_script(
-        self, 
-        flow_data: Dict[str, Any], 
-        filename: Optional[str] = None,
-        class_name: str = "GeneratedUser",
-        wait_time_min: float = 1.0,
-        wait_time_max: float = 3.0,
-        base_url: Optional[str] = None
-    ) -> str:
-        """
-        Generate a Locust script from flow data.
-        
-        Args:
-            flow_data: Flow data containing requests to convert
-            filename: Output filename (auto-generated if None)
-            class_name: Name of the HttpUser class
-            wait_time_min: Minimum wait time between requests
-            wait_time_max: Maximum wait time between requests
-            base_url: Base URL for requests (auto-detected if None)
-            
-        Returns:
-            Path to the generated script file
-        """
-        flows = flow_data.get('flows', [])
-        if not flows:
-            raise ValueError("No flows found in the provided data")
-        
-        # Generate filename if not provided
-        if not filename:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"locustfile_{timestamp}.py"
-        
-        # Ensure .py extension
-        if not filename.endswith('.py'):
-            filename += '.py'
-        
-        script_path = self.scripts_dir / filename
-        
-        # Extract base URL if not provided
-        if not base_url:
-            base_url = self._extract_base_url(flows)
-        
-        # Generate script content
-        script_content = self._generate_script_content(
-            flows, 
-            flow_data.get('metadata', {}),
-            class_name,
-            wait_time_min,
-            wait_time_max,
-            base_url,
-            filename
-        )
-        
-        # Write script to file
-        with open(script_path, 'w', encoding='utf-8') as f:
-            f.write(script_content)
-        
-        return str(script_path)
-    
-    def _extract_base_url(self, flows: List[Dict[str, Any]]) -> str:
-        """Extract base URL from flows."""
-        domains = set()
-        for flow in flows:
-            url = flow.get('url', '')
-            if '://' in url:
-                domain = url.split('/')[2]
-                domains.add(domain)
-        
-        return list(domains)[0] if domains else "http://localhost"
-    
-    def _generate_script_content(
-        self,
-        flows: List[Dict[str, Any]],
-        metadata: Dict[str, Any],
-        class_name: str,
-        wait_time_min: float,
-        wait_time_max: float,
-        base_url: str,
-        filename: str
-    ) -> str:
-        """Generate the complete Locust script content."""
-        
-        # Generate script header
-        script_content = f'''"""
-Generated Locust script from flow data
-Generated at: {datetime.now().isoformat()}
-Total requests: {len(flows)}
-Base URL: {base_url}
-"""
-
-from locust import HttpUser, task, between
-import json
-import random
+TEMPLATE_HEADER = '''from locust import HttpUser, task, between, events
+from prometheus_client import Counter, Histogram, Gauge, start_http_server
 import time
+import urllib3
+import json
 
+# Disable SSL warnings for self-signed certificates
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-class {class_name}(HttpUser):
-    """
-    Generated Locust user class from flow data.
+# Prometheus metrics - Cleaner structure
+REQUEST_COUNT = Counter('locust_requests_total', 'Total requests', ['method', 'endpoint', 'status'])
+REQUEST_DURATION = Histogram('locust_request_duration_seconds', 'Request duration in seconds', ['method', 'endpoint'], buckets=[0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0])
+ACTIVE_USERS = Gauge('locust_active_users', 'Number of active users')
+REQUEST_RATE = Gauge('locust_request_rate', 'Requests per second')
+ERROR_RATE = Gauge('locust_error_rate', 'Error rate percentage')
+
+# Start Prometheus metrics server on port 8001
+start_http_server(8001)
+
+# Custom metrics tracking
+@events.request.add_listener
+def track_request_metrics(request_type, name, response_time, response_length, response, context, exception, **kwargs):
+    """Track custom metrics for Prometheus with cleaner endpoint names"""
+    status = 'success' if exception is None else 'failure'
+    method = request_type.upper() if request_type else 'UNKNOWN'
+
+    # Clean up endpoint names - remove query parameters and cache IDs for cleaner metrics
+    endpoint = name or 'unknown'
+    if '?' in endpoint:
+        endpoint = endpoint.split('?')[0]
+    if '.dot.html' in endpoint:
+        endpoint = endpoint.replace('.dot.html', '')
+    if 'cacheId=' in endpoint:
+        endpoint = endpoint.split('cacheId=')[0].rstrip('?&')
+
+    REQUEST_COUNT.labels(method=method, endpoint=endpoint, status=status).inc()
+    REQUEST_DURATION.labels(method=method, endpoint=endpoint).observe(response_time / 1000.0)
+
+    # Update active users count
+    if hasattr(context, 'environment') and hasattr(context.environment, 'runner'):
+        ACTIVE_USERS.set(context.environment.runner.user_count)
+
+@events.test_start.add_listener
+def on_test_start(environment, **kwargs):
+    """Initialize metrics on test start"""
+    ACTIVE_USERS.set(0)
+
+class RecordedUser(HttpUser):
+    wait_time = between(1, 3)
     
-    This class simulates user behavior based on the provided flow data.
-    """
-    wait_time = between({wait_time_min}, {wait_time_max})
-    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Disable SSL verification for self-signed certificates
+        self.client.verify = False
+
     def on_start(self):
-        """Called when a user starts."""
-        self.client.verify = False  # Disable SSL verification for testing
-        print(f"Starting {{self.__class__.__name__}} user session...")
+        # Shared context for correlation
+        self._context = {}
+        
+        # Test initial connection to provide early feedback
+        try:
+            with self.client.get("/", catch_response=True) as response:
+                if response.status_code == 0:
+                    print("⚠️  WARNING: Cannot connect to the target server. Please ensure the application is running and accessible.")
+                elif response.status_code >= 400:
+                    print(f"⚠️  WARNING: Server returned status {response.status_code}. Check if the application is properly configured.")
+                else:
+                    print("✅ Successfully connected to the target server.")
+                response.success()  # Mark the test response as successful
+        except Exception as e:
+            print(f"⚠️  WARNING: Connection test failed - {str(e)}")
     
-    def on_stop(self):
-        """Called when a user stops."""
-        print(f"Ending {{self.__class__.__name__}} user session...")
-    
+    def context(self):
+        return self._context
 '''
-        
-        # Generate task methods for each flow
-        for i, flow in enumerate(flows):
-            task_method = self._generate_task_method(flow, i + 1)
-            script_content += task_method
-        
-        # Add footer with usage instructions
-        script_content += f'''
-# Usage Instructions:
-# 1. Install Locust: pip install locust
-# 2. Run the script: locust -f {self.scripts_dir.name}/{filename} --host={base_url}
-# 3. Open web UI: http://localhost:8089
-# 4. Configure users and spawn rate in the web interface
-# 5. Start the test and monitor results
 
-# Alternative command line usage:
-# locust -f {self.scripts_dir.name}/{filename} --host={base_url} --users 10 --spawn-rate 2 --run-time 30s
-'''
-        
-        return script_content
-    
-    def _generate_task_method(self, flow: Dict[str, Any], task_number: int) -> str:
-        """Generate a task method for a single flow."""
-        method = flow.get('method', 'GET').upper()
-        url = flow.get('url', '')
-        headers = flow.get('request_headers', [])
-        body = flow.get('request_body', {})
-        expected_status = flow.get('status_code', 200)
-        
-        # Convert headers to dict
-        headers_dict = self._convert_headers_to_dict(headers)
-        
-        # Extract path from URL
-        path = self._extract_path_from_url(url)
-        
-        # Generate task method name
-        task_name = f"task_{task_number}_{method.lower()}"
-        
-        # Generate method docstring
-        docstring = f'        """{method} {path} - {flow.get("name", f"Request {task_number}")}"""'
-        
-        # Generate task method
-        task_method = f'''
-    @task({max(1, 10 - task_number)})  # Higher priority for earlier requests
-    def {task_name}(self):
-{docstring}
-        url = "{path}"
-        headers = {json.dumps(headers_dict, indent=8)}
-        
-'''
-        
-        # Add request body handling for POST/PUT/PATCH requests
-        if body and method in ['POST', 'PUT', 'PATCH']:
-            if isinstance(body, dict):
-                task_method += f'''        data = {json.dumps(body, indent=8)}
-        
-        with self.client.{method.lower()}(url, headers=headers, json=data, catch_response=True) as response:
-            if response.status_code == {expected_status}:
-                response.success()
+STEP_TEMPLATE = """
+    @task
+    def step_{idx}(self):
+        try:
+            with self.client.{method}(
+                "{url}",
+                headers={headers},
+                data={body},
+                cookies={cookies},
+                catch_response=True,
+                name="{name}"
+            ) as resp:
+                # Handle different response scenarios with meaningful error messages
+                if resp.status_code == 0:
+                    resp.failure("Connection failed - Server may be down or unreachable. Check if the target application is running and accessible.")
+                elif resp.status_code == 200:
+                    content_type = resp.headers.get("Content-Type", "")
+                    if "application/json" in content_type:
+                        try:
+                            data = resp.json()
+{set_context_code}
+                            resp.success()
+                        except Exception as e:
+                            resp.failure(f"Failed to parse JSON response: {{str(e)}}")
+                    else:
+                        resp.success()
+                elif resp.status_code == 404:
+                    resp.failure(f"Endpoint not found (404) - The URL '{{resp.url}}' does not exist on the server.")
+                elif resp.status_code == 500:
+                    resp.failure(f"Internal server error (500) - The server encountered an error processing the request to '{{resp.url}}'.")
+                elif resp.status_code == 401:
+                    resp.failure(f"Unauthorized (401) - Authentication required for '{{resp.url}}'. Check credentials or session.")
+                elif resp.status_code == 403:
+                    resp.failure(f"Forbidden (403) - Access denied for '{{resp.url}}'. Check permissions.")
+                elif resp.status_code == 400:
+                    resp.failure(f"Bad request (400) - Invalid request to '{{resp.url}}'. Check request parameters.")
+                elif resp.status_code >= 500:
+                    resp.failure(f"Server error ({{resp.status_code}}) - The server is experiencing issues with '{{resp.url}}'.")
+                elif resp.status_code >= 400:
+                    resp.failure(f"Client error ({{resp.status_code}}) - Request failed for '{{resp.url}}'.")
+                else:
+                    resp.failure(f"Unexpected response status {{resp.status_code}} for '{{resp.url}}'.")
+        except Exception as e:
+            # Handle connection errors and other exceptions
+            error_msg = ""
+            if "ConnectionError" in str(type(e).__name__):
+                error_msg = "Connection error - Unable to connect to the server. Check if the target application is running."
+            elif "Timeout" in str(type(e).__name__):
+                error_msg = "Request timeout - The server took too long to respond. Check server performance."
+            elif "SSLError" in str(type(e).__name__):
+                error_msg = "SSL error - Certificate or SSL configuration issue."
             else:
-                response.failure(f"Expected status {expected_status}, got {{response.status_code}}")
-'''
-            else:
-                task_method += f'''        data = {json.dumps(str(body), indent=8)}
-        
-        with self.client.{method.lower()}(url, headers=headers, data=data, catch_response=True) as response:
-            if response.status_code == {expected_status}:
-                response.success()
-            else:
-                response.failure(f"Expected status {expected_status}, got {{response.status_code}}")
-'''
+                error_msg = f"Unexpected error: {{str(e)}}"
+            
+            # Use Locust's events to report the failure
+            events.request.fire(
+                request_type="{method}",
+                name="{name}",
+                response_time=0,
+                response_length=0,
+                response=None,
+                context=self,
+                exception=e
+            )
+"""
+
+BROWSER_TEMPLATE = """
+    @task
+    def browser_step_{idx}(self):
+        from selenium import webdriver
+        import time
+        driver = webdriver.Chrome()
+        driver.get("{url}")
+        time.sleep({wait_time})
+        driver.quit()
+"""
+
+def generate_step_code(idx, flow):
+    # Extract relative path from full URL
+    full_url = flow["url"]
+    if "://" in full_url:
+        # Extract path from full URL (e.g., "http://localhost/path" -> "/path")
+        url_parts = full_url.split("://", 1)[1].split("/", 1)
+        if len(url_parts) > 1:
+            relative_url = "/" + url_parts[1]
         else:
-            task_method += f'''        with self.client.{method.lower()}(url, headers=headers, catch_response=True) as response:
-            if response.status_code == {expected_status}:
-                response.success()
-            else:
-                response.failure(f"Expected status {expected_status}, got {{response.status_code}}")
-'''
-        
-        return task_method
+            relative_url = "/"
+    else:
+        relative_url = full_url
     
-    def _convert_headers_to_dict(self, headers: List[Dict[str, str]]) -> Dict[str, str]:
-        """Convert headers list to dictionary."""
-        headers_dict = {}
-        for header in headers:
-            if isinstance(header, dict) and 'name' in header and 'value' in header:
-                headers_dict[header['name']] = header['value']
-        return headers_dict
+    headers_code = str(flow.get("headers", {}))
     
-    def _extract_path_from_url(self, url: str) -> str:
-        """Extract path from full URL."""
-        if '://' in url:
-            parts = url.split('/')
-            if len(parts) > 3:
-                return '/' + '/'.join(parts[3:])
-            else:
-                return '/'
-        return url
-
-
-def generate_locust_script_from_flow(
-    flow_data: Dict[str, Any],
-    output_file: Optional[str] = None,
-    scripts_dir: str = "scripts",
-    **kwargs
-) -> str:
-    """
-    Convenience function to generate a Locust script from flow data.
+    # Properly escape JSON body data to avoid syntax errors
+    if flow.get("body"):
+        try:
+            # Try to parse as JSON to validate and re-serialize properly
+            body_data = json.loads(flow.get("body"))
+            body_code = f'json.dumps({repr(body_data)})'
+        except (json.JSONDecodeError, TypeError):
+            # If not valid JSON, escape the string properly
+            body_code = repr(flow.get("body"))
+    else:
+        body_code = "None"
     
-    Args:
-        flow_data: Flow data containing requests to convert
-        output_file: Output filename (auto-generated if None)
-        scripts_dir: Directory to save the script
-        **kwargs: Additional arguments passed to LocustGenerator
-        
-    Returns:
-        Path to the generated script file
-        
-    Example:
-        >>> flow_data = {
-        ...     "flows": [
-        ...         {
-        ...             "method": "GET",
-        ...             "url": "https://api.example.com/users",
-        ...             "status_code": 200,
-        ...             "request_headers": [{"name": "Accept", "value": "application/json"}]
-        ...         }
-        ...     ]
-        ... }
-        >>> script_path = generate_locust_script_from_flow(flow_data)
-        >>> print(f"Generated script: {script_path}")
-    """
-    generator = LocustGenerator(scripts_dir)
-    return generator.generate_locust_script(flow_data, output_file, **kwargs)
+    cookies_code = "{" + ", ".join([f'"{k.replace("cookie_","")}": self._context.get("{k}", "")' for k in flow.get("use_context", []) if k.startswith("cookie_")]) + "}" if any(k.startswith("cookie_") for k in flow.get("use_context", [])) else "None"
 
+    set_context_code = ""
+    for k in flow.get("set_context", []):
+        if k.startswith("cookie_"):
+            cname = k.replace("cookie_", "")
+            set_context_code += f'                        if "{cname}" in resp.cookies:\n'
+            set_context_code += f'                            self._context["{k}"] = resp.cookies["{cname}"]\n'
+        else:
+            set_context_code += f'                        if "{k}" in data:\n'
+            set_context_code += f'                            self._context["{k}"] = data.get("{k}")\n'
+
+    # Create cleaner task name
+    task_name = relative_url.split("/")[-1] or f"Step{idx}"
+    if '?' in task_name:
+        task_name = task_name.split('?')[0]
+    if '.dot.html' in task_name:
+        task_name = task_name.replace('.dot.html', '')
+    if 'cacheId=' in task_name:
+        task_name = task_name.split('cacheId=')[0].rstrip('?&')
+    
+    return STEP_TEMPLATE.format(
+        idx=idx,
+        method=flow["method"].lower(),
+        url=relative_url,
+        headers=headers_code,
+        body=body_code,
+        cookies=cookies_code,
+        name=task_name,
+        set_context_code=set_context_code
+    )
+
+def generate_locust(yaml_path, out_path):
+    with open(yaml_path, "r", encoding="utf-8") as f:
+        flows = yaml.safe_load(f)
+
+    code = TEMPLATE_HEADER
+    for i, flow in enumerate(flows, 1):
+        code += generate_step_code(i, flow)
+        # Skip browser tasks for load testing - only generate HTTP tasks
+        # if flow.get("frontend_task"):
+        #     code += BROWSER_TEMPLATE.format(idx=i, url=flow["url"], wait_time=2)
+
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(code)
+    print(f"✅ Observability-ready Locust script generated at {out_path}")
 
 if __name__ == "__main__":
-    # Example usage
-    example_flow_data = {
-        "metadata": {
-            "version": "1.2",
-            "total_entries": 2
-        },
-        "flows": [
-            {
-                "id": "flow_1",
-                "name": "Get Users",
-                "method": "GET",
-                "url": "https://api.example.com/users",
-                "status_code": 200,
-                "request_headers": [
-                    {"name": "Accept", "value": "application/json"},
-                    {"name": "User-Agent", "value": "Locust/1.0"}
-                ],
-                "response_time": 150
-            },
-            {
-                "id": "flow_2",
-                "name": "Create User",
-                "method": "POST",
-                "url": "https://api.example.com/users",
-                "status_code": 201,
-                "request_headers": [
-                    {"name": "Content-Type", "value": "application/json"},
-                    {"name": "Accept", "value": "application/json"}
-                ],
-                "request_body": {
-                    "name": "John Doe",
-                    "email": "john@example.com"
-                },
-                "response_time": 200
-            }
-        ]
-    }
+    import sys
+    if len(sys.argv) != 3:
+        print("Usage: python locust_generator.py <yaml_file> <output_file>")
+        sys.exit(1)
     
-    # Generate script
-    script_path = generate_locust_script_from_flow(example_flow_data)
-    print(f"Generated Locust script: {script_path}")
-    print(f"Run with: locust -f {script_path} --host=https://api.example.com")
+    yaml_file = sys.argv[1]
+    output_file = sys.argv[2]
+    generate_locust(yaml_file, output_file)

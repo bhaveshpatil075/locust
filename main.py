@@ -1,5 +1,6 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Query
+from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 import os
 import shutil
 import json
@@ -13,6 +14,22 @@ import time
 
 app = FastAPI(title="HAR File Upload API", version="1.0.0")
 
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",  # React development server
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",  # Alternative port
+        "http://127.0.0.1:3001",
+        "http://localhost:8080",  # Alternative frontend port
+        "http://127.0.0.1:8080",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all HTTP methods
+    allow_headers=["*"],  # Allow all headers
+)
+
 # Create uploads directory if it doesn't exist
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
@@ -23,6 +40,58 @@ SCRIPTS_DIR.mkdir(exist_ok=True)
 
 # Store running Locust processes
 running_processes = {}
+used_ports = set()  # Track used ports to prevent conflicts
+
+def find_available_port(start_port=8089):
+    """Find an available port starting from start_port"""
+    import socket
+    port = start_port
+    while port in used_ports:
+        port += 1
+    
+    # Test if port is actually available
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.bind(('localhost', port))
+        sock.close()
+        used_ports.add(port)
+        return port
+    except OSError:
+        # Port is in use, try next one
+        port += 1
+        while port < start_port + 100:  # Don't go too far
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.bind(('localhost', port))
+                sock.close()
+                used_ports.add(port)
+                return port
+            except OSError:
+                port += 1
+        raise Exception(f"No available ports found starting from {start_port}")
+
+def cleanup_process(process_id):
+    """Clean up a process and free its port"""
+    if process_id in running_processes:
+        process_info = running_processes[process_id]
+        process = process_info["process"]
+        port = process_info.get("port")
+        
+        # Terminate the process
+        try:
+            process.terminate()
+            process.wait(timeout=5)  # Wait up to 5 seconds
+        except subprocess.TimeoutExpired:
+            process.kill()  # Force kill if it doesn't terminate
+        except:
+            pass  # Process might already be dead
+        
+        # Free the port
+        if port:
+            used_ports.discard(port)
+        
+        # Remove from tracking
+        del running_processes[process_id]
 
 @app.post("/upload")
 async def upload_har_file(file: UploadFile = File(...)):
@@ -78,10 +147,14 @@ async def root():
         "endpoints": {
             "POST /upload": "Upload HAR files",
             "POST /convert": "Convert HAR files to flow format",
+            "POST /convert-timestamp": "Convert HAR files to flow format using timestamp",
             "POST /generate": "Generate Locust script from flow data",
             "GET /scripts": "List available Locust scripts",
-            "GET /run": "Run Locust script and get UI URL",
-            "GET /stop/{process_id}": "Stop running Locust process",
+            "GET /run": "Run Locust script and get UI URL (GET with query parameters)",
+            "POST /run": "Run Locust script and get UI URL (POST with JSON body)",
+            "GET /stop": "Stop Locust processes by script name (or all if no script specified)",
+            "GET /stop-all": "Stop all running Locust processes",
+            "GET /stop/{process_id}": "Stop specific Locust process by process ID",
             "GET /status": "Get status of all processes",
             "GET /": "API information",
             "GET /health": "Health check"
@@ -89,39 +162,105 @@ async def root():
     }
 
 @app.post("/convert")
-async def convert_har_to_flow(file: UploadFile = File(...)):
+async def convert_har_to_flow(request: Request):
     """
     Convert a HAR file to flow format.
+    Supports both file upload and JSON data with timestamp.
     
-    Args:
-        file: The HAR file to convert
-        
     Returns:
         JSON response with converted flow data
     """
-    # Check if file has .har extension
-    if not file.filename.lower().endswith('.har'):
+    content_type = request.headers.get("content-type", "")
+    
+    if "multipart/form-data" in content_type:
+        # File upload mode
+        form = await request.form()
+        file = form.get("file")
+        
+        if not file or not file.filename:
+            raise HTTPException(
+                status_code=400,
+                detail="No file provided"
+            )
+        
+        if not file.filename.lower().endswith('.har'):
+            raise HTTPException(
+                status_code=400, 
+                detail="Only HAR files are allowed. Please upload a file with .har extension."
+            )
+        
+        try:
+            # Read the HAR file content
+            content = await file.read()
+            har_data = json.loads(content.decode('utf-8'))
+            filename = file.filename
+            timestamp = datetime.now().isoformat()
+            
+        except json.JSONDecodeError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid HAR file format. Please ensure the file is a valid JSON HAR file."
+            )
+    
+    elif "application/json" in content_type:
+        # JSON data mode
+        try:
+            data = await request.json()
+        except json.JSONDecodeError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid JSON data"
+            )
+        
+        timestamp = data.get('timestamp')
+        filename = data.get('filename', 'recording.har')
+        
+        if not timestamp:
+            raise HTTPException(
+                status_code=400,
+                detail="Timestamp is required in the request body"
+            )
+        
+        # Check if the HAR file exists
+        file_path = UPLOAD_DIR / filename
+        if not file_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"HAR file '{filename}' not found in uploads directory"
+            )
+        
+        try:
+            # Read the HAR file content
+            with open(file_path, 'r', encoding='utf-8') as f:
+                har_data = json.load(f)
+        except json.JSONDecodeError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid HAR file format. Please ensure the file is a valid JSON HAR file."
+            )
+    
+    else:
         raise HTTPException(
-            status_code=400, 
-            detail="Only HAR files are allowed. Please upload a file with .har extension."
+            status_code=400,
+            detail="Content-Type must be either multipart/form-data or application/json"
         )
     
     try:
-        # Read the HAR file content
-        content = await file.read()
-        har_data = json.loads(content.decode('utf-8'))
-        
         # Extract basic information from HAR
         log = har_data.get('log', {})
         entries = log.get('entries', [])
+        print(f"DEBUG: Found {len(entries)} entries in HAR file")
         
-        # Convert HAR entries to flow format (mock implementation)
+        # Convert HAR entries to flow format
         flows = []
         for i, entry in enumerate(entries):
             request = entry.get('request', {})
             response = entry.get('response', {})
             
-            # Create a mock flow entry
+            if i < 3:  # Debug first 3 entries
+                print(f"DEBUG: Entry {i}: method={request.get('method')}, url={request.get('url', '')[:50]}...")
+            
+            # Create a flow entry
             flow_entry = {
                 "id": f"flow_{i+1}",
                 "name": f"Request {i+1}",
@@ -146,7 +285,8 @@ async def convert_har_to_flow(file: UploadFile = File(...)):
                 "browser": log.get('browser', {}),
                 "pages": log.get('pages', []),
                 "total_entries": len(entries),
-                "converted_at": "2024-01-01T00:00:00Z"
+                "converted_at": timestamp,
+                "requested_at": timestamp
             },
             "flows": flows,
             "summary": {
@@ -161,7 +301,104 @@ async def convert_har_to_flow(file: UploadFile = File(...)):
             status_code=200,
             content={
                 "message": "HAR file converted to flow successfully",
-                "filename": file.filename,
+                "filename": filename,
+                "timestamp": timestamp,
+                "flow_data": flow_data
+            }
+        )
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error converting HAR file: {str(e)}"
+        )
+
+@app.post("/convert-timestamp")
+async def convert_with_timestamp(data: Dict[str, Any]):
+    """
+    Convert HAR file to flow format using a timestamp parameter.
+    
+    Args:
+        data: JSON data containing timestamp and optional filename
+        
+    Returns:
+        JSON response with converted flow data
+    """
+    try:
+        timestamp = data.get('timestamp')
+        filename = data.get('filename', 'recording.har')
+        
+        if not timestamp:
+            raise HTTPException(
+                status_code=400,
+                detail="Timestamp is required in the request body"
+            )
+        
+        # Check if the HAR file exists
+        file_path = UPLOAD_DIR / filename
+        if not file_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"HAR file '{filename}' not found in uploads directory"
+            )
+        
+        # Read the HAR file content
+        with open(file_path, 'r', encoding='utf-8') as f:
+            har_data = json.load(f)
+        
+        # Extract basic information from HAR
+        log = har_data.get('log', {})
+        entries = log.get('entries', [])
+        
+        # Convert HAR entries to flow format
+        flows = []
+        for i, entry in enumerate(entries):
+            request = entry.get('request', {})
+            response = entry.get('response', {})
+            
+            # Create a flow entry
+            flow_entry = {
+                "id": f"flow_{i+1}",
+                "name": f"Request {i+1}",
+                "method": request.get('method', 'GET'),
+                "url": request.get('url', ''),
+                "status_code": response.get('status', 200),
+                "response_time": entry.get('time', 0),
+                "request_headers": request.get('headers', []),
+                "response_headers": response.get('headers', []),
+                "request_body": request.get('postData', {}),
+                "response_body": response.get('content', {}),
+                "timestamp": entry.get('startedDateTime', ''),
+                "flow_type": "http_request"
+            }
+            flows.append(flow_entry)
+        
+        # Create the flow structure
+        flow_data = {
+            "metadata": {
+                "version": log.get('version', '1.2'),
+                "creator": log.get('creator', {}),
+                "browser": log.get('browser', {}),
+                "pages": log.get('pages', []),
+                "total_entries": len(entries),
+                "converted_at": timestamp,
+                "requested_at": timestamp
+            },
+            "flows": flows,
+            "summary": {
+                "total_requests": len(flows),
+                "unique_domains": len(set(flow['url'].split('/')[2] if '://' in flow['url'] else '' for flow in flows)),
+                "methods": list(set(flow['method'] for flow in flows)),
+                "status_codes": list(set(flow['status_code'] for flow in flows))
+            }
+        }
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "message": "HAR file converted to flow successfully",
+                "filename": filename,
+                "timestamp": timestamp,
                 "flow_data": flow_data
             }
         )
@@ -191,6 +428,9 @@ async def generate_locust_script(flow_data: Dict[str, Any]):
     try:
         # Extract flows from the input data
         flows = flow_data.get('flows', [])
+        print(f"DEBUG: Processing {len(flows)} flows")
+        print(f"DEBUG: Flow data keys: {list(flow_data.keys())}")
+        print(f"DEBUG: First few flows: {flows[:3] if isinstance(flows, list) and flows else 'No flows found'}")
         if not flows:
             raise HTTPException(
                 status_code=400,
@@ -203,7 +443,7 @@ async def generate_locust_script(flow_data: Dict[str, Any]):
         script_path = SCRIPTS_DIR / script_filename
         
         # Generate Locust script content
-        locust_script = generate_locust_script_content(flows, flow_data.get('metadata', {}))
+        locust_script = generate_locust_script_content(flows, flow_data.get('metadata', {}), script_filename)
         
         # Write script to file
         with open(script_path, 'w', encoding='utf-8') as f:
@@ -225,105 +465,79 @@ async def generate_locust_script(flow_data: Dict[str, Any]):
         )
     
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error in generate_locust_script: {error_details}")  # Debug print
         raise HTTPException(
             status_code=500,
             detail=f"Error generating Locust script: {str(e)}"
         )
 
-def generate_locust_script_content(flows: list, metadata: dict) -> str:
-    """Generate Locust script content from flows."""
+def generate_locust_script_content(flows: list, metadata: dict, script_filename: str) -> str:
+    """Generate Locust script content from flows using the improved generator."""
     
-    # Extract unique domains for base URL
-    domains = set()
-    for flow in flows:
-        url = flow.get('url', '')
-        if '://' in url:
-            domain = url.split('/')[2]
-            domains.add(domain)
-    
-    base_url = list(domains)[0] if domains else "http://localhost"
-    
-    # Generate script header
-    script_content = f'''"""
-Generated Locust script from HAR file
-Generated at: {datetime.now().isoformat()}
-Total requests: {len(flows)}
-"""
-
-from locust import HttpUser, task, between
-import json
-import random
-
-
-class GeneratedUser(HttpUser):
-    wait_time = between(1, 3)  # Wait between 1-3 seconds between requests
-    
-    def on_start(self):
-        """Called when a user starts."""
-        self.client.verify = False  # Disable SSL verification for testing
-        print("Starting user session...")
-    
-    def on_stop(self):
-        """Called when a user stops."""
-        print("Ending user session...")
-    
-'''
-    
-    # Generate task methods for each flow
+    # Convert flows to the format expected by the improved generator
+    converted_flows = []
     for i, flow in enumerate(flows):
-        method = flow.get('method', 'GET').upper()
-        url = flow.get('url', '')
-        headers = flow.get('request_headers', [])
-        body = flow.get('request_body', {})
+        # Check if flow is a dictionary, if not skip it
+        if not isinstance(flow, dict):
+            print(f"WARNING: Skipping non-dict flow: {type(flow)} - {flow}")
+            continue
         
-        # Convert headers to dict
+        # Convert headers from list format to dict format
         headers_dict = {}
-        for header in headers:
+        for header in flow.get('request_headers', []):
             if isinstance(header, dict) and 'name' in header and 'value' in header:
                 headers_dict[header['name']] = header['value']
         
-        # Extract path from URL
-        if '://' in url:
-            path = '/' + '/'.join(url.split('/')[3:])
+        # Convert request body
+        body_data = flow.get('request_body', {})
+        if isinstance(body_data, dict) and body_data:
+            body_str = json.dumps(body_data)
         else:
-            path = url
+            body_str = None
         
-        # Generate task method
-        task_name = f"task_{i+1}_{method.lower()}"
-        script_content += f'''
-    @task({max(1, 10 - i)})  # Higher priority for earlier requests
-    def {task_name}(self):
-        """{method} {path}"""
-        url = "{path}"
-        headers = {json.dumps(headers_dict, indent=8)}
-        
+        # Create converted flow
+        converted_flow = {
+            "method": flow.get('method', 'GET'),
+            "url": flow.get('url', ''),
+            "headers": headers_dict,
+            "body": body_str,
+            "set_context": [],  # No context setting for now
+            "use_context": []   # No context usage for now
+        }
+        converted_flows.append(converted_flow)
+    
+    # Use the improved template from locust_generator.py
+    from locust_generator import TEMPLATE_HEADER, generate_step_code
+    
+    # Generate script using the improved template
+    script_content = f'''
+"""
+Generated Locust script from HAR file
+Generated at: {datetime.now().isoformat()}
+Total requests: {len(converted_flows)}
+"""
+
+{TEMPLATE_HEADER}
 '''
+    
+    # Generate task methods for each flow using the improved template
+    print(f"DEBUG: Generating tasks for {len(converted_flows)} converted flows")
+    for i, flow in enumerate(converted_flows):
+        print(f"DEBUG: Processing flow {i+1}: {flow.get('method', 'UNKNOWN')} {flow.get('url', 'UNKNOWN')[:50]}...")
         
-        # Add request body if present
-        if body and method in ['POST', 'PUT', 'PATCH']:
-            if isinstance(body, dict):
-                script_content += f'''        data = {json.dumps(body, indent=8)}
-        
-        with self.client.{method.lower()}(url, headers=headers, json=data, catch_response=True) as response:
-            if response.status_code == {flow.get('status_code', 200)}:
-                response.success()
-            else:
-                response.failure(f"Expected status {flow.get('status_code', 200)}, got {{response.status_code}}")
-'''
-        else:
-            script_content += f'''        with self.client.{method.lower()}(url, headers=headers, catch_response=True) as response:
-            if response.status_code == {flow.get('status_code', 200)}:
-                response.success()
-            else:
-                response.failure(f"Expected status {flow.get('status_code', 200)}, got {{response.status_code}}")
-'''
+        # Use the generate_step_code function from locust_generator.py
+        task_method = generate_step_code(i+1, flow)
+        script_content += task_method
     
     # Add footer
     script_content += f'''
 
 # Configuration for running the script
-# Command to run: locust -f {script_filename} --host={base_url}
+# Command to run: locust -f {script_filename} --host=<target_host>
 # Web UI: http://localhost:8089
+# Prometheus metrics: http://localhost:8001/metrics
 '''
     
     return script_content
@@ -358,17 +572,9 @@ async def list_scripts():
             detail=f"Error listing scripts: {str(e)}"
         )
 
-@app.get("/run")
-async def run_locust_script(
-    script: Optional[str] = Query(None, description="Script filename to run"),
-    host: Optional[str] = Query("http://localhost", description="Target host URL"),
-    port: int = Query(8089, description="Locust web UI port"),
-    users: int = Query(1, description="Number of concurrent users"),
-    spawn_rate: int = Query(1, description="User spawn rate"),
-    run_time: Optional[str] = Query(None, description="Run time (e.g., '30s', '5m', '1h')")
-):
+async def run_locust_script_internal(script: Optional[str], host: str, port: int, users: int, spawn_rate: int, run_time: Optional[str]):
     """
-    Run a Locust script and return the UI URL.
+    Internal function to run a Locust script.
     
     Args:
         script: Script filename to run (if not provided, uses the most recent script)
@@ -401,26 +607,36 @@ async def run_locust_script(
         
         # Check if Locust is installed
         try:
-            subprocess.run(["locust", "--version"], capture_output=True, check=True)
+            subprocess.run(["python", "-m", "locust", "--version"], capture_output=True, check=True)
         except (subprocess.CalledProcessError, FileNotFoundError):
             raise HTTPException(
                 status_code=500,
                 detail="Locust is not installed. Please install it with: pip install locust"
             )
         
+        # Find an available port
+        actual_port = find_available_port(port)
+        
         # Build Locust command
         cmd = [
-            "locust",
+            "python", "-m", "locust",
             "-f", str(script_path),
             "--host", host,
             "--web-host", "0.0.0.0",
-            "--web-port", str(port),
+            "--web-port", str(actual_port),
             "--users", str(users),
             "--spawn-rate", str(spawn_rate)
         ]
         
+        # Add headless mode only if run_time is specified (for automatic completion)
+        if run_time:
+            cmd.append("--headless")  # Run in headless mode when run_time is specified
+        
+        # If no run_time specified, add a default 30 second run time to prevent hanging
         if run_time:
             cmd.extend(["--run-time", run_time])
+        else:
+            cmd.extend(["--run-time", "30s"])
         
         # Start Locust process
         process = subprocess.Popen(
@@ -436,7 +652,7 @@ async def run_locust_script(
             "process": process,
             "script": script,
             "host": host,
-            "port": port,
+            "port": actual_port,  # Use the actual port that was assigned
             "users": users,
             "spawn_rate": spawn_rate,
             "started_at": datetime.now().isoformat(),
@@ -448,11 +664,14 @@ async def run_locust_script(
         
         # Check if process is still running
         if process.poll() is None:
-            ui_url = f"http://localhost:{port}"
+            ui_url = f"http://localhost:{actual_port}"
+            mode = "headless mode" if run_time else "web UI mode"
+            note = "Test is running in headless mode. Check the process status endpoint for results." if run_time else f"Test is running with web UI. Access the interface at {ui_url}"
+            
             return JSONResponse(
                 status_code=200,
                 content={
-                    "message": "Locust script started successfully",
+                    "message": f"Locust script started successfully in {mode}",
                     "process_id": process_id,
                     "script": script,
                     "ui_url": ui_url,
@@ -460,9 +679,10 @@ async def run_locust_script(
                     "port": port,
                     "users": users,
                     "spawn_rate": spawn_rate,
-                    "run_time": run_time,
+                    "run_time": run_time or "unlimited",
                     "status": "running",
-                    "started_at": running_processes[process_id]["started_at"]
+                    "started_at": running_processes[process_id]["started_at"],
+                    "note": note
                 }
             )
         else:
@@ -479,6 +699,161 @@ async def run_locust_script(
         raise HTTPException(
             status_code=500,
             detail=f"Error running Locust script: {str(e)}"
+        )
+
+@app.post("/run")
+async def run_locust_script_post(request_data: Dict[str, Any]):
+    """
+    Run a Locust script via POST request.
+    
+    Args:
+        request_data: JSON data containing script parameters
+        
+    Returns:
+        JSON response with Locust UI URL and process information
+    """
+    try:
+        script = request_data.get('script')
+        host = request_data.get('host', 'http://localhost')
+        port = request_data.get('port', 8089)
+        users = request_data.get('users', 1)
+        spawn_rate = request_data.get('spawn_rate', 1)
+        run_time = request_data.get('run_time')
+        
+        return await run_locust_script_internal(script, host, port, users, spawn_rate, run_time)
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error running Locust script: {str(e)}"
+        )
+
+@app.get("/run")
+async def run_locust_script(
+    script: Optional[str] = Query(None, description="Script filename to run"),
+    host: Optional[str] = Query("http://localhost", description="Target host URL"),
+    port: int = Query(8089, description="Locust web UI port"),
+    users: int = Query(1, description="Number of concurrent users"),
+    spawn_rate: int = Query(1, description="User spawn rate"),
+    run_time: Optional[str] = Query(None, description="Run time (e.g., '30s', '5m', '1h')")
+):
+    """
+    Run a Locust script and return the UI URL.
+    
+    Args:
+        script: Script filename to run (if not provided, uses the most recent script)
+        host: Target host URL
+        port: Locust web UI port
+        users: Number of concurrent users
+        spawn_rate: User spawn rate
+        run_time: Run time duration
+        
+    Returns:
+        JSON response with Locust UI URL and process information
+    """
+    try:
+        return await run_locust_script_internal(script, host, port, users, spawn_rate, run_time)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error running Locust script: {str(e)}"
+        )
+
+@app.get("/stop-all")
+async def stop_all_locust_processes():
+    """
+    Stop all running Locust processes.
+    
+    Returns:
+        JSON response with stop status for all processes
+    """
+    try:
+        stopped_processes = []
+        failed_processes = []
+        
+        for process_id in list(running_processes.keys()):
+            try:
+                cleanup_process(process_id)
+                stopped_processes.append(process_id)
+            except Exception as e:
+                failed_processes.append({
+                    "process_id": process_id,
+                    "error": str(e)
+                })
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "message": f"Stopped {len(stopped_processes)} processes",
+                "stopped_processes": stopped_processes,
+                "failed_processes": failed_processes,
+                "total_stopped": len(stopped_processes),
+                "total_failed": len(failed_processes)
+            }
+        )
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error stopping processes: {str(e)}"
+        )
+
+@app.get("/stop")
+async def stop_locust_by_script(script: Optional[str] = Query(None, description="Script name to stop")):
+    """
+    Stop Locust processes by script name or all if no script specified.
+    
+    Args:
+        script: Script name to stop (if not provided, stops all)
+        
+    Returns:
+        JSON response with stop status
+    """
+    try:
+        if script:
+            # Stop processes for specific script
+            stopped_processes = []
+            for process_id, process_info in list(running_processes.items()):
+                if process_info["script"] == script:
+                    process = process_info["process"]
+                    if process.poll() is None:  # Process is still running
+                        try:
+                            process.terminate()
+                            process.wait(timeout=5)
+                            process_info["status"] = "stopped"
+                            process_info["stopped_at"] = datetime.now().isoformat()
+                            stopped_processes.append(process_id)
+                        except Exception as e:
+                            pass  # Continue with other processes
+            
+            if not stopped_processes:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"No running processes found for script '{script}'"
+                )
+            
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "message": f"Stopped {len(stopped_processes)} processes for script '{script}'",
+                    "script": script,
+                    "stopped_processes": stopped_processes,
+                    "total_stopped": len(stopped_processes)
+                }
+            )
+        else:
+            # Stop all processes
+            return await stop_all_locust_processes()
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error stopping processes: {str(e)}"
         )
 
 @app.get("/stop/{process_id}")
@@ -502,11 +877,8 @@ async def stop_locust_process(process_id: str):
         process_info = running_processes[process_id]
         process = process_info["process"]
         
-        if process.poll() is None:  # Process is still running
-            process.terminate()
-            process.wait(timeout=5)
-            process_info["status"] = "stopped"
-            process_info["stopped_at"] = datetime.now().isoformat()
+        # Use the cleanup function for proper process termination
+        cleanup_process(process_id)
         
         return JSONResponse(
             status_code=200,
@@ -514,7 +886,7 @@ async def stop_locust_process(process_id: str):
                 "message": "Locust process stopped successfully",
                 "process_id": process_id,
                 "status": "stopped",
-                "stopped_at": process_info.get("stopped_at")
+                "stopped_at": datetime.now().isoformat()
             }
         )
     
@@ -533,7 +905,9 @@ async def get_process_status():
         active_processes = []
         for process_id, process_info in running_processes.items():
             process = process_info["process"]
-            if process.poll() is None:  # Still running
+            poll_result = process.poll()
+            print(f"DEBUG: Process {process_id} poll result: {poll_result}")
+            if poll_result is None:  # Still running
                 process_info["status"] = "running"
             else:
                 process_info["status"] = "stopped"
@@ -567,10 +941,33 @@ async def get_process_status():
             detail=f"Error getting process status: {str(e)}"
         )
 
+def cleanup_dead_processes():
+    """Clean up processes that have died but are still in our tracking"""
+    dead_processes = []
+    for process_id, process_info in list(running_processes.items()):
+        process = process_info["process"]
+        if process.poll() is not None:  # Process has died
+            dead_processes.append(process_id)
+            # Free the port
+            port = process_info.get("port")
+            if port:
+                used_ports.discard(port)
+    
+    # Remove dead processes from tracking
+    for process_id in dead_processes:
+        del running_processes[process_id]
+    
+    return len(dead_processes)
+
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
-    return {"status": "healthy"}
+    """Health check endpoint with process cleanup."""
+    cleaned = cleanup_dead_processes()
+    return {
+        "status": "healthy",
+        "active_processes": len(running_processes),
+        "cleaned_dead_processes": cleaned
+    }
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
