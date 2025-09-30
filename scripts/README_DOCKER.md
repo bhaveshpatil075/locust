@@ -21,7 +21,7 @@ This directory contains Docker Compose configuration for running Locust load tes
    - Start the load test
 
 4. **Access the main API server**:
-   - API server runs on http://localhost:8001
+   - API server runs on http://localhost:9001
    - Health check: http://localhost:8001/health
 
 ## Configuration

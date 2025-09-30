@@ -332,21 +332,21 @@ def generate_step_code(idx, flow, target_host=None):
                 # Use json parameter only if content-type is application/json
                 if content_type and 'application/json' in content_type:
                     data_param = "json"
-                    # Preserve the original JSON structure exactly with context substitution
-                    body_code = f'self._substitute_context_values(json.dumps({repr(body_data)}))'
+                    # Use Python dictionary directly for json parameter
+                    body_code = repr(body_data)
                 else:
                     # Use data parameter for form-encoded or other content types
                     data_param = "data"
                     # For form-encoded data, convert dict to form string
                     if content_type and 'application/x-www-form-urlencoded' in content_type:
                         form_data = '&'.join([f'{k}={v}' for k, v in body_data.items()])
-                        body_code = f'self._substitute_context_values({repr(form_data)})'
+                        body_code = repr(form_data)
                     else:
                         # For other content types, use the dict as-is
-                        body_code = f'self._substitute_context_values({repr(body_data)})'
+                        body_code = repr(body_data)
             else:
                 # For other cases, use 'data' parameter with JSON string
-                body_code = f'self._substitute_context_values(json.dumps({repr(body_data)}))'
+                body_code = f'json.dumps({repr(body_data)})'
         except (json.JSONDecodeError, TypeError):
             # If not valid JSON, use as raw data with context substitution
             body_code = f'self._substitute_context_values({repr(flow.get("body"))})'
@@ -504,22 +504,22 @@ def generate_authentication_code(auth_flows, target_host):
                 # Use json parameter only if content-type is application/json
                 if content_type and 'application/json' in content_type:
                     data_param = "json"
-                    body_code = f'self._substitute_context_values(json.dumps({repr(body_data)}))'
+                    body_code = repr(body_data)
                 else:
                     # Use data parameter for form-encoded or other content types
                     data_param = "data"
                     # For form-encoded data, convert dict to form string
                     if content_type and 'application/x-www-form-urlencoded' in content_type:
                         form_data = '&'.join([f'{k}={v}' for k, v in body_data.items()])
-                        body_code = f'self._substitute_context_values({repr(form_data)})'
+                        body_code = repr(form_data)
                     else:
                         # For other content types, use the dict as-is
-                        body_code = f'self._substitute_context_values({repr(body_data)})'
+                        body_code = repr(body_data)
             else:
-                body_code = f'self._substitute_context_values(json.dumps({repr(body_data)}))'
+                body_code = f'json.dumps({repr(body_data)})'
         except (json.JSONDecodeError, TypeError):
             # If not valid JSON, use as raw data
-            body_code = f'self._substitute_context_values({repr(flow.get("body"))})'
+            body_code = repr(flow.get("body"))
     
     auth_code = f'''
     def _authenticate(self):

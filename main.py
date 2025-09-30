@@ -288,6 +288,16 @@ async def convert_har_to_flow(request: Request):
                 print(f"DEBUG: Entry {i}: method={request.get('method')}, url={request.get('url', '')[:50]}...")
             
             # Create a flow entry with better data preservation
+            # Extract request body properly from postData
+            request_body = None
+            post_data = request.get('postData', {})
+            if post_data:
+                if isinstance(post_data, dict):
+                    # Extract text content from postData
+                    request_body = post_data.get('text', '')
+                else:
+                    request_body = str(post_data)
+            
             flow_entry = {
                 "id": f"flow_{i+1}",
                 "name": f"Request {i+1}",
@@ -297,7 +307,7 @@ async def convert_har_to_flow(request: Request):
                 "response_time": entry.get('time', 0),
                 "request_headers": request.get('headers', []),
                 "response_headers": response.get('headers', []),
-                "request_body": request.get('postData', {}),  # This contains the actual JSON data
+                "request_body": request_body,  # Now contains the actual body text
                 "response_body": response.get('content', {}),
                 "timestamp": entry.get('startedDateTime', ''),
                 "flow_type": "http_request"
@@ -408,6 +418,16 @@ async def convert_with_timestamp(data: Dict[str, Any]):
             response = entry.get('response', {})
             
             # Create a flow entry with better data preservation
+            # Extract request body properly from postData
+            request_body = None
+            post_data = request.get('postData', {})
+            if post_data:
+                if isinstance(post_data, dict):
+                    # Extract text content from postData
+                    request_body = post_data.get('text', '')
+                else:
+                    request_body = str(post_data)
+            
             flow_entry = {
                 "id": f"flow_{i+1}",
                 "name": f"Request {i+1}",
@@ -417,7 +437,7 @@ async def convert_with_timestamp(data: Dict[str, Any]):
                 "response_time": entry.get('time', 0),
                 "request_headers": request.get('headers', []),
                 "response_headers": response.get('headers', []),
-                "request_body": request.get('postData', {}),  # This contains the actual JSON data
+                "request_body": request_body,  # Now contains the actual body text
                 "response_body": response.get('content', {}),
                 "timestamp": entry.get('startedDateTime', ''),
                 "flow_type": "http_request"
@@ -1175,4 +1195,4 @@ async def health_check():
     }
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=9001)

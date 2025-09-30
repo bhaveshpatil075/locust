@@ -1,7 +1,7 @@
 
 """
 Generated Locust script from HAR file
-Generated at: 2025-09-30T20:32:10.262875
+Generated at: 2025-09-30T23:38:52.880055
 Total requests: 37
 """
 
@@ -198,8 +198,8 @@ class RecordedUser(HttpUser):
         try:
             with self.client.post(
                 '/Wizer/Authentication/Authenticate',
-                headers={'Content-Type': 'application/json'},
-                data=None,
+                headers={'accept': 'application/json, text/javascript, */*; q=0.01', 'accept-encoding': 'gzip, deflate, br, zstd', 'accept-language': 'en-US,en;q=0.9', 'content-length': '37', 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8', 'origin': 'https://techdev.btspulse.com', 'priority': 'u=1, i', 'referer': 'https://techdev.btspulse.com/Wizer/Wizer/Logout', 'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-origin', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'x-requested-with': 'XMLHttpRequest'},
+                data='email=admin&pass=wizer&language=en-US',
                 catch_response=True,
                 name="Authentication"
             ) as resp:
@@ -236,7 +236,7 @@ class RecordedUser(HttpUser):
         substituted_body = None
         
         # Add authentication headers if available
-        auth_headers = self._add_auth_headers({'Accept': 'application/json, text/javascript, */*; q=0.01', 'X-Requested-With': 'XMLHttpRequest'})
+        auth_headers = self._add_auth_headers({'accept': 'text/html, */*; q=0.01', 'accept-encoding': 'gzip, deflate, br, zstd', 'accept-language': 'en-US,en;q=0.9', 'priority': 'u=1, i', 'referer': 'https://techdev.btspulse.com/Wizer', 'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-origin', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'x-requested-with': 'XMLHttpRequest'})
         
         with self.client.get(
             substituted_url,
@@ -278,7 +278,7 @@ class RecordedUser(HttpUser):
         substituted_body = None
         
         # Add authentication headers if available
-        auth_headers = self._add_auth_headers({'Content-Type': 'application/json', 'Accept': 'application/json, text/javascript, */*; q=0.01', 'X-Requested-With': 'XMLHttpRequest'})
+        auth_headers = self._add_auth_headers({'accept': 'application/json, text/javascript, */*; q=0.01', 'accept-encoding': 'gzip, deflate, br, zstd', 'accept-language': 'en-US,en;q=0.9', 'content-length': '0', 'origin': 'https://techdev.btspulse.com', 'priority': 'u=1, i', 'referer': 'https://techdev.btspulse.com/Wizer', 'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-origin', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'x-requested-with': 'XMLHttpRequest', 'Content-Type': 'application/json'})
         
         with self.client.post(
             substituted_url,
@@ -320,7 +320,7 @@ class RecordedUser(HttpUser):
         substituted_body = None
         
         # Add authentication headers if available
-        auth_headers = self._add_auth_headers({'Accept': 'application/json, text/javascript, */*; q=0.01', 'X-Requested-With': 'XMLHttpRequest'})
+        auth_headers = self._add_auth_headers({'accept': 'application/json, text/javascript, */*; q=0.01', 'accept-encoding': 'gzip, deflate, br, zstd', 'accept-language': 'en-US,en;q=0.9', 'priority': 'u=1, i', 'referer': 'https://techdev.btspulse.com/Wizer/Authoring/', 'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-origin', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'x-requested-with': 'XMLHttpRequest'})
         
         with self.client.get(
             substituted_url,
@@ -362,7 +362,7 @@ class RecordedUser(HttpUser):
         substituted_body = None
         
         # Add authentication headers if available
-        auth_headers = self._add_auth_headers({'Accept': 'application/json, text/javascript, */*; q=0.01', 'X-Requested-With': 'XMLHttpRequest'})
+        auth_headers = self._add_auth_headers({'accept': 'application/json, text/javascript, */*; q=0.01', 'accept-encoding': 'gzip, deflate, br, zstd', 'accept-language': 'en-US,en;q=0.9', 'priority': 'u=1, i', 'referer': 'https://techdev.btspulse.com/Wizer/Authoring/', 'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-origin', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'x-requested-with': 'XMLHttpRequest'})
         
         with self.client.get(
             substituted_url,
@@ -404,7 +404,7 @@ class RecordedUser(HttpUser):
         substituted_body = None
         
         # Add authentication headers if available
-        auth_headers = self._add_auth_headers({'Accept': 'application/json, text/javascript, */*; q=0.01', 'X-Requested-With': 'XMLHttpRequest'})
+        auth_headers = self._add_auth_headers({'accept': 'application/json, text/javascript, */*; q=0.01', 'accept-encoding': 'gzip, deflate, br, zstd', 'accept-language': 'en-US,en;q=0.9', 'priority': 'u=1, i', 'referer': 'https://techdev.btspulse.com/Wizer/Authoring/', 'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-origin', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'x-requested-with': 'XMLHttpRequest'})
         
         with self.client.get(
             substituted_url,
@@ -446,7 +446,7 @@ class RecordedUser(HttpUser):
         substituted_body = None
         
         # Add authentication headers if available
-        auth_headers = self._add_auth_headers({'Accept': 'application/json, text/javascript, */*; q=0.01', 'X-Requested-With': 'XMLHttpRequest'})
+        auth_headers = self._add_auth_headers({'accept': 'application/json, text/javascript, */*; q=0.01', 'accept-encoding': 'gzip, deflate, br, zstd', 'accept-language': 'en-US,en;q=0.9', 'priority': 'u=1, i', 'referer': 'https://techdev.btspulse.com/Wizer/Authoring/', 'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-origin', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'x-requested-with': 'XMLHttpRequest'})
         
         with self.client.get(
             substituted_url,
@@ -488,7 +488,7 @@ class RecordedUser(HttpUser):
         substituted_body = None
         
         # Add authentication headers if available
-        auth_headers = self._add_auth_headers({'Accept': 'application/json, text/javascript, */*; q=0.01', 'X-Requested-With': 'XMLHttpRequest'})
+        auth_headers = self._add_auth_headers({'accept': 'text/plain, */*; q=0.01', 'accept-encoding': 'gzip, deflate, br, zstd', 'accept-language': 'en-US,en;q=0.9', 'content-type': 'application/json; charset=UTF-8', 'priority': 'u=1, i', 'referer': 'https://techdev.btspulse.com/Wizer/Authoring/', 'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-origin', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'x-requested-with': 'XMLHttpRequest'})
         
         with self.client.get(
             substituted_url,
@@ -530,7 +530,7 @@ class RecordedUser(HttpUser):
         substituted_body = None
         
         # Add authentication headers if available
-        auth_headers = self._add_auth_headers({'Accept': 'application/json, text/javascript, */*; q=0.01', 'X-Requested-With': 'XMLHttpRequest'})
+        auth_headers = self._add_auth_headers({'accept': 'text/plain, */*; q=0.01', 'accept-encoding': 'gzip, deflate, br, zstd', 'accept-language': 'en-US,en;q=0.9', 'content-type': 'application/json; charset=UTF-8', 'priority': 'u=1, i', 'referer': 'https://techdev.btspulse.com/Wizer/Authoring/', 'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-origin', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'x-requested-with': 'XMLHttpRequest'})
         
         with self.client.get(
             substituted_url,
@@ -572,7 +572,7 @@ class RecordedUser(HttpUser):
         substituted_body = None
         
         # Add authentication headers if available
-        auth_headers = self._add_auth_headers({'Accept': 'application/json, text/javascript, */*; q=0.01', 'X-Requested-With': 'XMLHttpRequest'})
+        auth_headers = self._add_auth_headers({'accept': 'application/json, text/javascript, */*; q=0.01', 'accept-encoding': 'gzip, deflate, br, zstd', 'accept-language': 'en-US,en;q=0.9', 'priority': 'u=1, i', 'referer': 'https://techdev.btspulse.com/Wizer/Authoring/', 'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-origin', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'x-requested-with': 'XMLHttpRequest'})
         
         with self.client.get(
             substituted_url,
@@ -611,15 +611,15 @@ class RecordedUser(HttpUser):
         
         # Substitute context values in URL and body
         substituted_url = self._substitute_context_values('/Wizer/Company/UpdateCompany')
-        substituted_body = None
+        substituted_body = {'id': 118, 'pId': 0, 'name': 'Company 123', 'description': 'test company1', 'enabled': True, 'UpdatedOn': '2025-09-30T13:01:43Z'}
         
         # Add authentication headers if available
-        auth_headers = self._add_auth_headers({'Content-Type': 'application/json', 'Accept': 'application/json, text/javascript, */*; q=0.01', 'X-Requested-With': 'XMLHttpRequest'})
+        auth_headers = self._add_auth_headers({'accept': 'application/json, text/javascript, */*; q=0.01', 'accept-encoding': 'gzip, deflate, br, zstd', 'accept-language': 'en-US,en;q=0.9', 'content-length': '119', 'content-type': 'application/json', 'origin': 'https://techdev.btspulse.com', 'priority': 'u=1, i', 'referer': 'https://techdev.btspulse.com/Wizer/Authoring/', 'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-origin', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'x-requested-with': 'XMLHttpRequest'})
         
         with self.client.put(
             substituted_url,
             headers=auth_headers,
-            data=substituted_body,
+            json=substituted_body,
             catch_response=True,
             name="UpdateCompany"
         ) as resp:
@@ -653,15 +653,15 @@ class RecordedUser(HttpUser):
         
         # Substitute context values in URL and body
         substituted_url = self._substitute_context_values('/Wizer/Company/UpdateCompany')
-        substituted_body = None
+        substituted_body = {'id': 117, 'pId': 0, 'name': 'testcomp1', 'description': 'testcomp 123', 'enabled': True, 'UpdatedOn': '2025-09-30T13:01:38Z'}
         
         # Add authentication headers if available
-        auth_headers = self._add_auth_headers({'Content-Type': 'application/json', 'Accept': 'application/json, text/javascript, */*; q=0.01', 'X-Requested-With': 'XMLHttpRequest'})
+        auth_headers = self._add_auth_headers({'accept': 'application/json, text/javascript, */*; q=0.01', 'accept-encoding': 'gzip, deflate, br, zstd', 'accept-language': 'en-US,en;q=0.9', 'content-length': '116', 'content-type': 'application/json', 'origin': 'https://techdev.btspulse.com', 'priority': 'u=1, i', 'referer': 'https://techdev.btspulse.com/Wizer/Authoring/', 'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-origin', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'x-requested-with': 'XMLHttpRequest'})
         
         with self.client.put(
             substituted_url,
             headers=auth_headers,
-            data=substituted_body,
+            json=substituted_body,
             catch_response=True,
             name="UpdateCompany"
         ) as resp:
@@ -698,7 +698,7 @@ class RecordedUser(HttpUser):
         substituted_body = None
         
         # Add authentication headers if available
-        auth_headers = self._add_auth_headers({'Accept': 'application/json, text/javascript, */*; q=0.01', 'X-Requested-With': 'XMLHttpRequest'})
+        auth_headers = self._add_auth_headers({'accept': 'application/json, text/javascript, */*; q=0.01', 'accept-encoding': 'gzip, deflate, br, zstd', 'accept-language': 'en-US,en;q=0.9', 'priority': 'u=1, i', 'referer': 'https://techdev.btspulse.com/Wizer/Authoring/', 'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-origin', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'x-requested-with': 'XMLHttpRequest'})
         
         with self.client.get(
             substituted_url,
@@ -740,7 +740,7 @@ class RecordedUser(HttpUser):
         substituted_body = None
         
         # Add authentication headers if available
-        auth_headers = self._add_auth_headers({'Accept': 'application/json, text/javascript, */*; q=0.01', 'X-Requested-With': 'XMLHttpRequest'})
+        auth_headers = self._add_auth_headers({'accept': 'application/json, text/javascript, */*; q=0.01', 'accept-encoding': 'gzip, deflate, br, zstd', 'accept-language': 'en-US,en;q=0.9', 'priority': 'u=1, i', 'referer': 'https://techdev.btspulse.com/Wizer/Authoring/', 'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-origin', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'x-requested-with': 'XMLHttpRequest'})
         
         with self.client.get(
             substituted_url,
@@ -782,7 +782,7 @@ class RecordedUser(HttpUser):
         substituted_body = None
         
         # Add authentication headers if available
-        auth_headers = self._add_auth_headers({'Accept': 'application/json, text/javascript, */*; q=0.01', 'X-Requested-With': 'XMLHttpRequest'})
+        auth_headers = self._add_auth_headers({'accept': 'application/json, text/javascript, */*; q=0.01', 'accept-encoding': 'gzip, deflate, br, zstd', 'accept-language': 'en-US,en;q=0.9', 'priority': 'u=1, i', 'referer': 'https://techdev.btspulse.com/Wizer/Authoring/', 'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-origin', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'x-requested-with': 'XMLHttpRequest'})
         
         with self.client.get(
             substituted_url,
@@ -824,7 +824,7 @@ class RecordedUser(HttpUser):
         substituted_body = None
         
         # Add authentication headers if available
-        auth_headers = self._add_auth_headers({'Accept': 'application/json, text/javascript, */*; q=0.01', 'X-Requested-With': 'XMLHttpRequest'})
+        auth_headers = self._add_auth_headers({'accept': 'application/json, text/javascript, */*; q=0.01', 'accept-encoding': 'gzip, deflate, br, zstd', 'accept-language': 'en-US,en;q=0.9', 'priority': 'u=1, i', 'referer': 'https://techdev.btspulse.com/Wizer/Authoring/', 'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-origin', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'x-requested-with': 'XMLHttpRequest'})
         
         with self.client.get(
             substituted_url,
@@ -866,7 +866,7 @@ class RecordedUser(HttpUser):
         substituted_body = None
         
         # Add authentication headers if available
-        auth_headers = self._add_auth_headers({'Accept': 'application/json, text/javascript, */*; q=0.01', 'X-Requested-With': 'XMLHttpRequest'})
+        auth_headers = self._add_auth_headers({'accept': 'application/json, text/javascript, */*; q=0.01', 'accept-encoding': 'gzip, deflate, br, zstd', 'accept-language': 'en-US,en;q=0.9', 'priority': 'u=1, i', 'referer': 'https://techdev.btspulse.com/Wizer/Authoring/', 'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-origin', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'x-requested-with': 'XMLHttpRequest'})
         
         with self.client.get(
             substituted_url,
@@ -908,7 +908,7 @@ class RecordedUser(HttpUser):
         substituted_body = None
         
         # Add authentication headers if available
-        auth_headers = self._add_auth_headers({'Accept': 'application/json, text/javascript, */*; q=0.01', 'X-Requested-With': 'XMLHttpRequest'})
+        auth_headers = self._add_auth_headers({'accept': 'application/json, text/javascript, */*; q=0.01', 'accept-encoding': 'gzip, deflate, br, zstd', 'accept-language': 'en-US,en;q=0.9', 'priority': 'u=1, i', 'referer': 'https://techdev.btspulse.com/Wizer/Authoring/', 'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-origin', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'x-requested-with': 'XMLHttpRequest'})
         
         with self.client.get(
             substituted_url,
@@ -950,7 +950,7 @@ class RecordedUser(HttpUser):
         substituted_body = None
         
         # Add authentication headers if available
-        auth_headers = self._add_auth_headers({'Accept': 'application/json, text/javascript, */*; q=0.01', 'X-Requested-With': 'XMLHttpRequest'})
+        auth_headers = self._add_auth_headers({'accept': 'application/json, text/javascript, */*; q=0.01', 'accept-encoding': 'gzip, deflate, br, zstd', 'accept-language': 'en-US,en;q=0.9', 'priority': 'u=1, i', 'referer': 'https://techdev.btspulse.com/Wizer/Authoring/', 'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-origin', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'x-requested-with': 'XMLHttpRequest'})
         
         with self.client.get(
             substituted_url,
@@ -992,7 +992,7 @@ class RecordedUser(HttpUser):
         substituted_body = None
         
         # Add authentication headers if available
-        auth_headers = self._add_auth_headers({'Accept': 'application/json, text/javascript, */*; q=0.01', 'X-Requested-With': 'XMLHttpRequest'})
+        auth_headers = self._add_auth_headers({'accept': 'application/json, text/javascript, */*; q=0.01', 'accept-encoding': 'gzip, deflate, br, zstd', 'accept-language': 'en-US,en;q=0.9', 'priority': 'u=1, i', 'referer': 'https://techdev.btspulse.com/Wizer/Authoring/', 'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-origin', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'x-requested-with': 'XMLHttpRequest'})
         
         with self.client.get(
             substituted_url,
@@ -1034,7 +1034,7 @@ class RecordedUser(HttpUser):
         substituted_body = None
         
         # Add authentication headers if available
-        auth_headers = self._add_auth_headers({'Accept': 'application/json, text/javascript, */*; q=0.01', 'X-Requested-With': 'XMLHttpRequest'})
+        auth_headers = self._add_auth_headers({'accept': 'application/json, text/javascript, */*; q=0.01', 'accept-encoding': 'gzip, deflate, br, zstd', 'accept-language': 'en-US,en;q=0.9', 'priority': 'u=1, i', 'referer': 'https://techdev.btspulse.com/Wizer/Authoring/', 'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-origin', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'x-requested-with': 'XMLHttpRequest'})
         
         with self.client.get(
             substituted_url,
@@ -1073,15 +1073,15 @@ class RecordedUser(HttpUser):
         
         # Substitute context values in URL and body
         substituted_url = self._substitute_context_values('/Wizer/UserAdmin/UserProfile')
-        substituted_body = None
+        substituted_body = {'userIds': [84469], 'eventIds': [], 'removeEventIds': [], 'todaysDate': '2025-09-30T13:31:25.017Z', 'newName': 'Bhavesh PatilTest ', 'companyIds': [], 'removeCompanyIds': [], 'userprofile': None}
         
         # Add authentication headers if available
-        auth_headers = self._add_auth_headers({'Content-Type': 'application/json', 'Accept': 'application/json, text/javascript, */*; q=0.01', 'X-Requested-With': 'XMLHttpRequest'})
+        auth_headers = self._add_auth_headers({'accept': 'application/json, text/javascript, */*; q=0.01', 'accept-encoding': 'gzip, deflate, br, zstd', 'accept-language': 'en-US,en;q=0.9', 'content-length': '181', 'content-type': 'application/json', 'origin': 'https://techdev.btspulse.com', 'priority': 'u=1, i', 'referer': 'https://techdev.btspulse.com/Wizer/Authoring/', 'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-origin', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'x-requested-with': 'XMLHttpRequest'})
         
         with self.client.post(
             substituted_url,
             headers=auth_headers,
-            data=substituted_body,
+            json=substituted_body,
             catch_response=True,
             name="UserProfile"
         ) as resp:
@@ -1118,7 +1118,7 @@ class RecordedUser(HttpUser):
         substituted_body = None
         
         # Add authentication headers if available
-        auth_headers = self._add_auth_headers({'Accept': 'application/json, text/javascript, */*; q=0.01', 'X-Requested-With': 'XMLHttpRequest'})
+        auth_headers = self._add_auth_headers({'accept': 'application/json, text/javascript, */*; q=0.01', 'accept-encoding': 'gzip, deflate, br, zstd', 'accept-language': 'en-US,en;q=0.9', 'priority': 'u=1, i', 'referer': 'https://techdev.btspulse.com/Wizer/Authoring/', 'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-origin', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'x-requested-with': 'XMLHttpRequest'})
         
         with self.client.get(
             substituted_url,
