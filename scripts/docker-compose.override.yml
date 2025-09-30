@@ -1,0 +1,55 @@
+# Override file for development
+# This file is automatically loaded by docker-compose
+
+services:
+  # Override for development - expose more ports
+  locust-master:
+    ports:
+      - "8089:8089"
+      - "5557:5557"
+      - "8000:8000"  # Additional port for custom metrics
+
+  # Add more workers for development
+  locust-worker-4:
+    build: .
+    container_name: locust-worker-4
+    environment:
+      - LOCUST_MODE=worker
+      - LOCUST_MASTER_HOST=locust-master
+      - LOCUST_MASTER_PORT=5557
+      - LOCUST_HOST=${LOCUST_HOST:-https://techdev.btspulse.com}
+      - LOCUST_SCRIPT_FILE=${LOCUST_SCRIPT_FILE:-techdev_btspulse_com.py}
+    volumes:
+      - .:/app/scripts
+    command: >
+      --locustfile=scripts/${LOCUST_SCRIPT_FILE}
+      --worker
+      --master-host=locust-master
+      --master-port=5557
+      --host=https://techdev.btspulse.com
+    networks:
+      - locust-network
+    depends_on:
+      - locust-master
+
+  locust-worker-5:
+    build: .
+    container_name: locust-worker-5
+    environment:
+      - LOCUST_MODE=worker
+      - LOCUST_MASTER_HOST=locust-master
+      - LOCUST_MASTER_PORT=5557
+      - LOCUST_HOST=${LOCUST_HOST:-https://techdev.btspulse.com}
+      - LOCUST_SCRIPT_FILE=${LOCUST_SCRIPT_FILE:-techdev_btspulse_com.py}
+    volumes:
+      - .:/app/scripts
+    command: >
+      --locustfile=scripts/${LOCUST_SCRIPT_FILE}
+      --worker
+      --master-host=locust-master
+      --master-port=5557
+      --host=https://techdev.btspulse.com
+    networks:
+      - locust-network
+    depends_on:
+      - locust-master

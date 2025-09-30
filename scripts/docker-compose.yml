@@ -1,0 +1,142 @@
+services:
+  # Locust Master - coordinates the test execution
+  locust-master:
+    build: .
+    container_name: locust-master
+    ports:
+      - "8089:8089"  # Web UI
+      - "5557:5557"  # Master communication port
+      - "8002:8002"  # Prometheus metrics port
+    environment:
+      - LOCUST_MODE=master
+      - LOCUST_MASTER_HOST=locust-master
+      - LOCUST_MASTER_PORT=5557
+      - LOCUST_WEB_HOST=0.0.0.0
+      - LOCUST_WEB_PORT=8089
+      - LOCUST_CSV=results
+      - LOCUST_HTML=results/report.html
+      - LOCUST_HOST=${LOCUST_HOST:-https://techdev.btspulse.com}
+      - LOCUST_SCRIPT_FILE=${LOCUST_SCRIPT_FILE:-techdev_btspulse_com.py}
+    volumes:
+      - ./results:/app/results
+      - .:/app/scripts
+    command: >
+      --locustfile=scripts/${LOCUST_SCRIPT_FILE}
+      --master
+      --web-host=0.0.0.0
+      --web-port=8089
+      --csv=results/locust
+      --html=results/locust_report.html
+    networks:
+      - locust-network
+    depends_on:
+      - prometheus
+
+  # Locust Workers - execute the actual load tests
+  locust-worker-1:
+    build: .
+    container_name: locust-worker-1
+    environment:
+      - LOCUST_MODE=worker
+      - LOCUST_MASTER_HOST=locust-master
+      - LOCUST_MASTER_PORT=5557
+      - LOCUST_HOST=${LOCUST_HOST:-https://techdev.btspulse.com}
+      - LOCUST_SCRIPT_FILE=${LOCUST_SCRIPT_FILE:-techdev_btspulse_com.py}
+    volumes:
+      - .:/app/scripts
+    command: >
+      --locustfile=scripts/${LOCUST_SCRIPT_FILE}
+      --worker
+      --master-host=locust-master
+      --master-port=5557
+    networks:
+      - locust-network
+    depends_on:
+      - locust-master
+
+  locust-worker-2:
+    build: .
+    container_name: locust-worker-2
+    environment:
+      - LOCUST_MODE=worker
+      - LOCUST_MASTER_HOST=locust-master
+      - LOCUST_MASTER_PORT=5557
+      - LOCUST_HOST=${LOCUST_HOST:-https://techdev.btspulse.com}
+      - LOCUST_SCRIPT_FILE=${LOCUST_SCRIPT_FILE:-techdev_btspulse_com.py}
+    volumes:
+      - .:/app/scripts
+    command: >
+      --locustfile=scripts/${LOCUST_SCRIPT_FILE}
+      --worker
+      --master-host=locust-master
+      --master-port=5557
+    networks:
+      - locust-network
+    depends_on:
+      - locust-master
+
+  locust-worker-3:
+    build: .
+    container_name: locust-worker-3
+    environment:
+      - LOCUST_MODE=worker
+      - LOCUST_MASTER_HOST=locust-master
+      - LOCUST_MASTER_PORT=5557
+      - LOCUST_HOST=${LOCUST_HOST:-https://techdev.btspulse.com}
+      - LOCUST_SCRIPT_FILE=${LOCUST_SCRIPT_FILE:-techdev_btspulse_com.py}
+    volumes:
+      - .:/app/scripts
+    command: >
+      --locustfile=scripts/${LOCUST_SCRIPT_FILE}
+      --worker
+      --master-host=locust-master
+      --master-port=5557
+    networks:
+      - locust-network
+    depends_on:
+      - locust-master
+
+  # Prometheus - metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - locust-network
+
+  # Grafana - monitoring dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./dashboards:/etc/grafana/provisioning/dashboards
+    networks:
+      - locust-network
+    depends_on:
+      - prometheus
+
+
+volumes:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  locust-network:
+    driver: bridge

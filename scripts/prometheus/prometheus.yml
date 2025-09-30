@@ -1,0 +1,27 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Locust master metrics
+  - job_name: 'locust-master'
+    static_configs:
+      - targets: ['locust-master:8002']
+    scrape_interval: 5s
+    metrics_path: /metrics
+
+  # Locust workers metrics (if they expose metrics)
+  - job_name: 'locust-workers'
+    static_configs:
+      - targets: ['locust-worker-1:8002', 'locust-worker-2:8002', 'locust-worker-3:8002']
+    scrape_interval: 5s
+    metrics_path: /metrics

@@ -24,6 +24,8 @@ app.add_middleware(
         "http://127.0.0.1:3001",
         "http://localhost:8080",  # Alternative frontend port
         "http://127.0.0.1:8080",
+        "http://localhost:8001",  # Main API server
+        "http://127.0.0.1:8001",
     ],
     allow_credentials=True,
     allow_methods=["*"],  # Allow all HTTP methods
@@ -148,7 +150,8 @@ async def root():
             "POST /upload": "Upload HAR files",
             "POST /convert": "Convert HAR files to flow format",
             "POST /convert-timestamp": "Convert HAR files to flow format using timestamp",
-            "POST /generate": "Generate Locust script from flow data",
+            "POST /generate": "Generate Locust script from flow data (supports filename and replace_existing parameters)",
+            "GET /generate-examples": "Get usage examples for the generate endpoint",
             "GET /scripts": "List available Locust scripts",
             "GET /run": "Run Locust script and get UI URL (GET with query parameters)",
             "POST /run": "Run Locust script and get UI URL (POST with JSON body)",
@@ -221,13 +224,37 @@ async def convert_har_to_flow(request: Request):
                 detail="Timestamp is required in the request body"
             )
         
-        # Check if the HAR file exists
+        # Check if the HAR file exists (with .har extension if not provided)
+        if not filename.lower().endswith('.har'):
+            filename = f"{filename}.har"
+        
         file_path = UPLOAD_DIR / filename
+        
+        # If file doesn't exist, try to find a similar file with different naming convention
         if not file_path.exists():
-            raise HTTPException(
-                status_code=404,
-                detail=f"HAR file '{filename}' not found in uploads directory"
-            )
+            # Try alternative filename formats
+            alternative_filenames = [
+                filename.replace('_', '.'),  # Convert underscores to dots
+                filename.replace('.', '_'),  # Convert dots to underscores
+                filename.replace('_', '-'),  # Convert underscores to dashes
+                filename.replace('.', '-'),  # Convert dots to dashes
+            ]
+            
+            found_file = None
+            for alt_filename in alternative_filenames:
+                alt_path = UPLOAD_DIR / alt_filename
+                if alt_path.exists():
+                    found_file = alt_filename
+                    file_path = alt_path
+                    break
+            
+            if not found_file:
+                # List available files for better error message
+                available_files = [f.name for f in UPLOAD_DIR.glob("*.har")]
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"HAR file '{filename}' not found in uploads directory. Available files: {available_files}"
+                )
         
         try:
             # Read the HAR file content
@@ -260,7 +287,7 @@ async def convert_har_to_flow(request: Request):
             if i < 3:  # Debug first 3 entries
                 print(f"DEBUG: Entry {i}: method={request.get('method')}, url={request.get('url', '')[:50]}...")
             
-            # Create a flow entry
+            # Create a flow entry with better data preservation
             flow_entry = {
                 "id": f"flow_{i+1}",
                 "name": f"Request {i+1}",
@@ -270,7 +297,7 @@ async def convert_har_to_flow(request: Request):
                 "response_time": entry.get('time', 0),
                 "request_headers": request.get('headers', []),
                 "response_headers": response.get('headers', []),
-                "request_body": request.get('postData', {}),
+                "request_body": request.get('postData', {}),  # This contains the actual JSON data
                 "response_body": response.get('content', {}),
                 "timestamp": entry.get('startedDateTime', ''),
                 "flow_type": "http_request"
@@ -334,13 +361,37 @@ async def convert_with_timestamp(data: Dict[str, Any]):
                 detail="Timestamp is required in the request body"
             )
         
-        # Check if the HAR file exists
+        # Check if the HAR file exists (with .har extension if not provided)
+        if not filename.lower().endswith('.har'):
+            filename = f"{filename}.har"
+        
         file_path = UPLOAD_DIR / filename
+        
+        # If file doesn't exist, try to find a similar file with different naming convention
         if not file_path.exists():
-            raise HTTPException(
-                status_code=404,
-                detail=f"HAR file '{filename}' not found in uploads directory"
-            )
+            # Try alternative filename formats
+            alternative_filenames = [
+                filename.replace('_', '.'),  # Convert underscores to dots
+                filename.replace('.', '_'),  # Convert dots to underscores
+                filename.replace('_', '-'),  # Convert underscores to dashes
+                filename.replace('.', '-'),  # Convert dots to dashes
+            ]
+            
+            found_file = None
+            for alt_filename in alternative_filenames:
+                alt_path = UPLOAD_DIR / alt_filename
+                if alt_path.exists():
+                    found_file = alt_filename
+                    file_path = alt_path
+                    break
+            
+            if not found_file:
+                # List available files for better error message
+                available_files = [f.name for f in UPLOAD_DIR.glob("*.har")]
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"HAR file '{filename}' not found in uploads directory. Available files: {available_files}"
+                )
         
         # Read the HAR file content
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -356,7 +407,7 @@ async def convert_with_timestamp(data: Dict[str, Any]):
             request = entry.get('request', {})
             response = entry.get('response', {})
             
-            # Create a flow entry
+            # Create a flow entry with better data preservation
             flow_entry = {
                 "id": f"flow_{i+1}",
                 "name": f"Request {i+1}",
@@ -366,7 +417,7 @@ async def convert_with_timestamp(data: Dict[str, Any]):
                 "response_time": entry.get('time', 0),
                 "request_headers": request.get('headers', []),
                 "response_headers": response.get('headers', []),
-                "request_body": request.get('postData', {}),
+                "request_body": request.get('postData', {}),  # This contains the actual JSON data
                 "response_body": response.get('content', {}),
                 "timestamp": entry.get('startedDateTime', ''),
                 "flow_type": "http_request"
@@ -421,6 +472,11 @@ async def generate_locust_script(flow_data: Dict[str, Any]):
     
     Args:
         flow_data: The flow data containing requests to convert to Locust script
+        - flows: Array of flow data (required)
+        - filename: Custom filename without extension (optional, defaults to auto-generated)
+        - replace_existing: Whether to replace existing files (optional, defaults to false)
+        - target_host: Target host URL for the script (optional, will be extracted from flows if not provided)
+        - metadata: Additional metadata (optional)
         
     Returns:
         JSON response with generated script information
@@ -428,22 +484,47 @@ async def generate_locust_script(flow_data: Dict[str, Any]):
     try:
         # Extract flows from the input data
         flows = flow_data.get('flows', [])
+        custom_filename = flow_data.get('filename')
+        replace_existing = flow_data.get('replace_existing', False)
+        target_host = flow_data.get('target_host')
+        
         print(f"DEBUG: Processing {len(flows)} flows")
+        print(f"DEBUG: Custom filename: {custom_filename}")
+        print(f"DEBUG: Replace existing: {replace_existing}")
         print(f"DEBUG: Flow data keys: {list(flow_data.keys())}")
         print(f"DEBUG: First few flows: {flows[:3] if isinstance(flows, list) and flows else 'No flows found'}")
+        
         if not flows:
             raise HTTPException(
                 status_code=400,
                 detail="No flows found in the provided data. Please ensure 'flows' array is present."
             )
         
-        # Generate timestamp for unique filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        script_filename = f"locust_script_{timestamp}.py"
+        # Determine filename
+        if custom_filename:
+            # Use provided filename + .py extension
+            script_filename = f"{custom_filename}.py"
+        else:
+            # Generate timestamp for unique filename (fallback)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            script_filename = f"locust_script_{timestamp}.py"
+        
         script_path = SCRIPTS_DIR / script_filename
         
+        # Check if file exists and handle replacement
+        if script_path.exists():
+            if replace_existing:
+                print(f"INFO: Replacing existing file: {script_filename}")
+            else:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"File '{script_filename}' already exists. Set 'replace_existing': true to overwrite."
+                )
+        else:
+            print(f"INFO: Creating new file: {script_filename}")
+        
         # Generate Locust script content
-        locust_script = generate_locust_script_content(flows, flow_data.get('metadata', {}), script_filename)
+        locust_script = generate_locust_script_content(flows, flow_data.get('metadata', {}), script_filename, target_host)
         
         # Write script to file
         with open(script_path, 'w', encoding='utf-8') as f:
@@ -460,6 +541,7 @@ async def generate_locust_script(flow_data: Dict[str, Any]):
                 "file_path": str(script_path),
                 "file_size": file_size,
                 "total_requests": len(flows),
+                "replaced_existing": script_path.exists() and replace_existing,
                 "script_preview": locust_script[:500] + "..." if len(locust_script) > 500 else locust_script
             }
         )
@@ -473,8 +555,18 @@ async def generate_locust_script(flow_data: Dict[str, Any]):
             detail=f"Error generating Locust script: {str(e)}"
         )
 
-def generate_locust_script_content(flows: list, metadata: dict, script_filename: str) -> str:
+def generate_locust_script_content(flows: list, metadata: dict, script_filename: str, target_host: str = None) -> str:
     """Generate Locust script content from flows using the improved generator."""
+    
+    # Extract target host from flows if not provided
+    if not target_host and flows:
+        # Try to extract host from the first flow's URL
+        first_flow = flows[0] if flows else {}
+        first_url = first_flow.get('url', '')
+        if '://' in first_url:
+            # Extract host from URL (e.g., "https://example.com/path" -> "https://example.com")
+            target_host = first_url.split('://')[0] + '://' + first_url.split('://')[1].split('/')[0]
+            print(f"DEBUG: Extracted target host from flows: {target_host}")
     
     # Convert flows to the format expected by the improved generator
     converted_flows = []
@@ -490,10 +582,14 @@ def generate_locust_script_content(flows: list, metadata: dict, script_filename:
             if isinstance(header, dict) and 'name' in header and 'value' in header:
                 headers_dict[header['name']] = header['value']
         
-        # Convert request body
+        # Convert request body - handle both dict and string formats
         body_data = flow.get('request_body', {})
         if isinstance(body_data, dict) and body_data:
+            # If it's a dict, convert to JSON string
             body_str = json.dumps(body_data)
+        elif isinstance(body_data, str) and body_data:
+            # If it's already a string, use it as-is
+            body_str = body_data
         else:
             body_str = None
         
@@ -509,7 +605,7 @@ def generate_locust_script_content(flows: list, metadata: dict, script_filename:
         converted_flows.append(converted_flow)
     
     # Use the improved template from locust_generator.py
-    from locust_generator import TEMPLATE_HEADER, generate_step_code
+    from locust_generator import TEMPLATE_HEADER, generate_step_code, is_authentication_flow, generate_authentication_code, requires_permissions, get_permission_level
     
     # Generate script using the improved template
     script_content = f'''
@@ -522,19 +618,34 @@ Total requests: {len(converted_flows)}
 {TEMPLATE_HEADER}
 '''
     
+    # Identify authentication flows
+    auth_flows = []
+    for i, flow in enumerate(converted_flows):
+        if is_authentication_flow(flow):
+            auth_flows.append((i+1, flow))
+    
+    # Generate authentication code if found
+    if auth_flows:
+        print(f"DEBUG: Found {len(auth_flows)} authentication flow(s)")
+        auth_code = generate_authentication_code(auth_flows, target_host)
+        script_content += auth_code
+    
     # Generate task methods for each flow using the improved template
     print(f"DEBUG: Generating tasks for {len(converted_flows)} converted flows")
     for i, flow in enumerate(converted_flows):
-        print(f"DEBUG: Processing flow {i+1}: {flow.get('method', 'UNKNOWN')} {flow.get('url', 'UNKNOWN')[:50]}...")
-        
-        # Use the generate_step_code function from locust_generator.py
-        task_method = generate_step_code(i+1, flow)
-        script_content += task_method
+        if not is_authentication_flow(flow):
+            print(f"DEBUG: Processing flow {i+1}: {flow.get('method', 'UNKNOWN')} {flow.get('url', 'UNKNOWN')[:50]}...")
+            
+            # Use the generate_step_code function from locust_generator.py
+            task_method = generate_step_code(i+1, flow, target_host)
+            script_content += task_method
     
-    # Add footer
+    # Add footer with target host information
+    host_info = f"# Target host: {target_host}" if target_host else "# Target host: Will be set via --host parameter"
     script_content += f'''
 
 # Configuration for running the script
+{host_info}
 # Command to run: locust -f {script_filename} --host=<target_host>
 # Web UI: http://localhost:8089
 # Prometheus metrics: http://localhost:8001/metrics
@@ -959,6 +1070,100 @@ def cleanup_dead_processes():
     
     return len(dead_processes)
 
+@app.get("/generate-examples")
+async def generate_examples():
+    """Get examples of how to use the generate endpoint with new parameters."""
+    return {
+        "message": "Generate endpoint usage examples",
+        "examples": {
+            "basic_usage": {
+                "description": "Basic usage with auto-generated filename",
+                "request": {
+                    "flows": [
+                        {
+                            "url": "http://localhost/api/test",
+                            "method": "GET",
+                            "headers": {"Accept": "application/json"}
+                        }
+                    ]
+                }
+            },
+            "custom_filename": {
+                "description": "Using custom filename without extension",
+                "request": {
+                    "flows": [
+                        {
+                            "url": "http://localhost/api/test",
+                            "method": "GET",
+                            "headers": {"Accept": "application/json"}
+                        }
+                    ],
+                    "filename": "my_custom_test"
+                },
+                "result": "Creates file: my_custom_test.py"
+            },
+            "replace_existing": {
+                "description": "Replace existing file if it exists",
+                "request": {
+                    "flows": [
+                        {
+                            "url": "http://localhost/api/test",
+                            "method": "GET",
+                            "headers": {"Accept": "application/json"}
+                        }
+                    ],
+                    "filename": "existing_script",
+                    "replace_existing": True
+                },
+                "result": "Overwrites existing_script.py if it exists"
+            },
+            "prevent_overwrite": {
+                "description": "Prevent overwriting existing files (default behavior)",
+                "request": {
+                    "flows": [
+                        {
+                            "url": "http://localhost/api/test",
+                            "method": "GET",
+                            "headers": {"Accept": "application/json"}
+                        }
+                    ],
+                    "filename": "existing_script",
+                    "replace_existing": False
+                },
+                "result": "Returns 409 error if existing_script.py already exists"
+            },
+            "with_metadata": {
+                "description": "Include metadata in the request",
+                "request": {
+                    "flows": [
+                        {
+                            "url": "http://localhost/api/test",
+                            "method": "GET",
+                            "headers": {"Accept": "application/json"}
+                        }
+                    ],
+                    "filename": "test_with_metadata",
+                    "replace_existing": True,
+                    "metadata": {
+                        "description": "Test script for API validation",
+                        "version": "1.0.0"
+                    }
+                }
+            }
+        },
+        "parameters": {
+            "flows": "Array of flow data (required)",
+            "filename": "Custom filename without .py extension (optional)",
+            "replace_existing": "Boolean to allow overwriting existing files (optional, default: false)",
+            "metadata": "Additional metadata object (optional)"
+        },
+        "response_codes": {
+            "200": "Script generated successfully",
+            "400": "No flows provided or invalid data",
+            "409": "File already exists and replace_existing is false"
+        }
+    }
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint with process cleanup."""
@@ -970,4 +1175,4 @@ async def health_check():
     }
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8001)
